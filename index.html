@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>じゃんけん - キミ vs CPU</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f7fb;
+    --panel: #ffffff;
+    --text: #1c2230;
+    --muted: #667085;
+    --line: #e4e7ee;
+    --accent: #3b6cf6;
+    --accent-text: #ffffff;
+    --win: #12805c;
+    --lose: #c0392b;
+    --draw: #8a6d1a;
+    --shadow: 0 8px 24px rgba(20, 30, 60, .08);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f131c;
+      --panel: #1a2030;
+      --text: #e8ecf5;
+      --muted: #9aa4b8;
+      --line: #2b3447;
+      --accent: #6b93ff;
+      --accent-text: #0b1020;
+      --win: #4ade9c;
+      --lose: #ff7d6e;
+      --draw: #ffd166;
+      --shadow: 0 8px 24px rgba(0, 0, 0, .35);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .game {
+    width: 100%;
+    max-width: 520px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    padding: 24px 20px;
+  }
+
+  h1 {
+    margin: 0 0 4px;
+    font-size: 1.5rem;
+    text-align: center;
+    letter-spacing: .04em;
+  }
+
+  .lead {
+    margin: 0 0 20px;
+    text-align: center;
+    color: var(--muted);
+    font-size: .85rem;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .stat {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 6px;
+    text-align: center;
+  }
+
+  .stat .label {
+    display: block;
+    font-size: .72rem;
+    color: var(--muted);
+    margin-bottom: 2px;
+  }
+
+  .stat .value {
+    font-size: 1.35rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat.win .value { color: var(--win); }
+  .stat.lose .value { color: var(--lose); }
+  .stat.draw .value { color: var(--draw); }
+
+  .streaks {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 20px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    font-size: .85rem;
+  }
+
+  .streaks strong {
+    font-size: 1.05rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .arena {
+    min-height: 190px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px;
+    margin-bottom: 20px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    text-align: center;
+  }
+
+  .hands {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    font-size: 2.6rem;
+    line-height: 1;
+    min-height: 58px;
+  }
+
+  .hands .side {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 72px;
+  }
+
+  .hands .who {
+    font-size: .7rem;
+    color: var(--muted);
+  }
+
+  .hands .hand {
+    font-size: 2.4rem;
+    min-height: 2.4rem;
+  }
+
+  .hands .vs {
+    color: var(--muted);
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .countdown {
+    font-size: 1.7rem;
+    font-weight: 800;
+    letter-spacing: .1em;
+    min-height: 2rem;
+  }
+
+  .countdown.pop {
+    animation: pop .34s ease-out;
+  }
+
+  @keyframes pop {
+    0% { transform: scale(.6); opacity: .3; }
+    60% { transform: scale(1.15); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .result {
+    font-size: 1.15rem;
+    font-weight: 700;
+    min-height: 1.5rem;
+  }
+
+  .result.win { color: var(--win); }
+  .result.lose { color: var(--lose); }
+  .result.draw { color: var(--draw); }
+
+  .choices {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .choice {
+    appearance: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 84px;
+    padding: 10px 4px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--panel);
+    color: var(--text);
+    font-family: inherit;
+    font-size: .95rem;
+    font-weight: 700;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: transform .08s ease, border-color .15s ease, background .15s ease;
+  }
+
+  .choice .emoji { font-size: 1.7rem; line-height: 1; }
+  .choice .key { font-size: .68rem; font-weight: 500; color: var(--muted); }
+
+  .choice:hover:not([aria-disabled="true"]) { border-color: var(--accent); }
+  .choice:active:not([aria-disabled="true"]) { transform: scale(.96); }
+  .choice:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  .choice[aria-disabled="true"] {
+    opacity: .45;
+    cursor: not-allowed;
+  }
+
+  .reset {
+    display: block;
+    width: 100%;
+    min-height: 48px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: .85rem;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .reset:hover { border-color: var(--accent); color: var(--text); }
+  .reset:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  @media (max-width: 380px) {
+    .game { padding: 20px 14px; }
+    .hands { gap: 10px; }
+    .choice { min-height: 76px; }
+  }
+</style>
+</head>
+<body>
+<main class="game">
+  <h1>じゃんけん</h1>
+  <p class="lead">ボタンか 1 / 2 / 3 キーで手を出そう</p>
+
+  <section class="stats" aria-label="通算成績">
+    <div class="stat win">
+      <span class="label">勝ち</span>
+      <span class="value" id="stat-win">0</span>
+    </div>
+    <div class="stat lose">
+      <span class="label">負け</span>
+      <span class="value" id="stat-lose">0</span>
+    </div>
+    <div class="stat draw">
+      <span class="label">あいこ</span>
+      <span class="value" id="stat-draw">0</span>
+    </div>
+  </section>
+
+  <section class="streaks" aria-label="連勝記録">
+    <span>現在の連勝 <strong id="stat-current">0</strong></span>
+    <span>最高連勝 <strong id="stat-max">0</strong></span>
+  </section>
+
+  <section class="arena" aria-label="対戦エリア">
+    <div class="hands">
+      <div class="side">
+        <span class="who">あなた</span>
+        <span class="hand" id="player-hand">？</span>
+      </div>
+      <span class="vs">VS</span>
+      <div class="side">
+        <span class="who">CPU</span>
+        <span class="hand" id="cpu-hand">？</span>
+      </div>
+    </div>
+    <div class="countdown" id="countdown" aria-hidden="true"></div>
+    <div class="result" id="result" role="status" aria-live="polite"></div>
+  </section>
+
+  <div class="choices">
+    <button class="choice" type="button" data-hand="rock">
+      <span class="emoji" aria-hidden="true">✊</span>
+      <span>グー</span>
+      <span class="key">1</span>
+    </button>
+    <button class="choice" type="button" data-hand="scissors">
+      <span class="emoji" aria-hidden="true">✌️</span>
+      <span>チョキ</span>
+      <span class="key">2</span>
+    </button>
+    <button class="choice" type="button" data-hand="paper">
+      <span class="emoji" aria-hidden="true">✋</span>
+      <span>パー</span>
+      <span class="key">3</span>
+    </button>
+  </div>
+
+  <button class="reset" type="button" id="reset">成績をリセット</button>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  var HANDS = {
+    rock: { label: 'グー', emoji: '✊' },
+    scissors: { label: 'チョキ', emoji: '✌️' },
+    paper: { label: 'パー', emoji: '✋' }
+  };
+  var HAND_KEYS = Object.keys(HANDS);
+
+  var STORAGE_KEY = 'janken-stats-v1';
+  var DEFAULT_STATS = {
+    wins: 0,
+    losses: 0,
+    draws: 0,
+    currentStreak: 0,
+    maxStreak: 0
+  };
+
+  function judge(player, cpu) {
+    if (player === cpu) return 'draw';
+    var wins =
+      (player === 'rock' && cpu === 'scissors') ||
+      (player === 'scissors' && cpu === 'paper') ||
+      (player === 'paper' && cpu === 'rock');
+    return wins ? 'win' : 'lose';
+  }
+
+  function loadStats() {
+    var stats = {
+      wins: DEFAULT_STATS.wins,
+      losses: DEFAULT_STATS.losses,
+      draws: DEFAULT_STATS.draws,
+      currentStreak: DEFAULT_STATS.currentStreak,
+      maxStreak: DEFAULT_STATS.maxStreak
+    };
+    try {
+      var raw = window.localStorage.getItem(STORAGE_KEY);
+      if (!raw) return stats;
+      var saved = JSON.parse(raw);
+      Object.keys(stats).forEach(function (key) {
+        var n = Number(saved && saved[key]);
+        if (Number.isFinite(n) && n >= 0) stats[key] = Math.floor(n);
+      });
+    } catch (e) {
+      /* localStorage が使えない環境では初期値のまま */
+    }
+    return stats;
+  }
+
+  function saveStats(stats) {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
+    } catch (e) {
+      /* 保存できなくてもゲームは続行 */
+    }
+  }
+
+  var stats = loadStats();
+  var locked = false;
+
+  var choiceButtons = Array.prototype.slice.call(document.querySelectorAll('.choice'));
+  var playerHandEl = document.getElementById('player-hand');
+  var cpuHandEl = document.getElementById('cpu-hand');
+  var countdownEl = document.getElementById('countdown');
+  var resultEl = document.getElementById('result');
+  var resetBtn = document.getElementById('reset');
+
+  function renderStats() {
+    document.getElementById('stat-win').textContent = stats.wins;
+    document.getElementById('stat-lose').textContent = stats.losses;
+    document.getElementById('stat-draw').textContent = stats.draws;
+    document.getElementById('stat-current').textContent = stats.currentStreak;
+    document.getElementById('stat-max').textContent = stats.maxStreak;
+  }
+
+  function setLocked(value) {
+    locked = value;
+    choiceButtons.forEach(function (btn) {
+      btn.setAttribute('aria-disabled', value ? 'true' : 'false');
+    });
+  }
+
+  function randomHand() {
+    return HAND_KEYS[Math.floor(Math.random() * HAND_KEYS.length)];
+  }
+
+  function sleep(ms) {
+    return new Promise(function (resolve) {
+      setTimeout(resolve, ms);
+    });
+  }
+
+  function pulse(word) {
+    countdownEl.textContent = word;
+    countdownEl.classList.remove('pop');
+    void countdownEl.offsetWidth;
+    countdownEl.classList.add('pop');
+  }
+
+  function applyResult(outcome) {
+    if (outcome === 'win') {
+      stats.wins += 1;
+      stats.currentStreak += 1;
+      if (stats.currentStreak > stats.maxStreak) {
+        stats.maxStreak = stats.currentStreak;
+      }
+    } else if (outcome === 'lose') {
+      stats.losses += 1;
+      stats.currentStreak = 0;
+    } else {
+      stats.draws += 1;
+      stats.currentStreak = 0;
+    }
+    saveStats(stats);
+    renderStats();
+  }
+
+  function resultText(outcome) {
+    if (outcome === 'win') return 'あなたの勝ち！';
+    if (outcome === 'lose') return 'あなたの負け…';
+    return 'あいこ！';
+  }
+
+  async function play(hand) {
+    if (locked) return;
+    setLocked(true);
+
+    var cpu = randomHand();
+    resultEl.textContent = '';
+    resultEl.className = 'result';
+    playerHandEl.textContent = HANDS[hand].emoji;
+    cpuHandEl.textContent = '？';
+    countdownEl.textContent = '';
+
+    pulse('じゃん');
+    await sleep(330);
+    pulse('けん');
+    await sleep(330);
+    pulse('ぽん');
+    await sleep(340);
+
+    var outcome = judge(hand, cpu);
+    applyResult(outcome);
+
+    countdownEl.textContent = '';
+    countdownEl.classList.remove('pop');
+    cpuHandEl.textContent = HANDS[cpu].emoji;
+    resultEl.textContent = resultText(outcome) +
+      '（あなた ' + HANDS[hand].label + ' / CPU ' + HANDS[cpu].label + '）';
+    resultEl.className = 'result ' + outcome;
+
+    setLocked(false);
+  }
+
+  choiceButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      play(btn.getAttribute('data-hand'));
+    });
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    var map = { '1': 'rock', '2': 'scissors', '3': 'paper' };
+    var codeMap = { Digit1: 'rock', Digit2: 'scissors', Digit3: 'paper', Numpad1: 'rock', Numpad2: 'scissors', Numpad3: 'paper' };
+    var hand = map[event.key] || codeMap[event.code];
+    if (!hand) return;
+    event.preventDefault();
+    play(hand);
+  });
+
+  resetBtn.addEventListener('click', function () {
+    if (locked) return;
+    if (!window.confirm('成績をリセットしますか？')) return;
+    stats = {
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      currentStreak: 0,
+      maxStreak: 0
+    };
+    saveStats(stats);
+    renderStats();
+    playerHandEl.textContent = '？';
+    cpuHandEl.textContent = '？';
+    countdownEl.textContent = '';
+    resultEl.textContent = '';
+    resultEl.className = 'result';
+  });
+
+  renderStats();
+
+  /* テストや拡張用に公開 */
+  window.judge = judge;
+  window.JankenGame = { play: play, judge: judge, getStats: function () { return stats; } };
+})();
+</script>
+</body>
+</html>
